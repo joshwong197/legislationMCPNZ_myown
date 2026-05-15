@@ -33,11 +33,11 @@ export function workIdToUrlFlexible(workId: string): string {
   return `${LEGISLATION_WEBSITE}/${legType}/${subtype}/${year}/${number}/en/latest/`;
 }
 
-// legislation.govt.nz is fronted by CloudFront + AWS WAF, which serves a
-// JS challenge page to requests that don't look like a real browser session.
-// Sending the full set of sec-fetch / sec-ch-ua headers + Accept-Encoding +
-// upgrade-insecure-requests sometimes lets us through; if not, we'll need to
-// proxy the fetch through a non-AWS-edge host.
+// legislation.govt.nz is fronted by a firewall that serves a JS challenge to
+// datacenter IPs. PCO's mitigation (per their all-API-users email): a request
+// to www.legislation.govt.nz carrying a valid API key — same X-Api-Key header
+// used to authenticate api.legislation.govt.nz — bypasses the JS challenge
+// rule. fetchLegislationHtml attaches that header below.
 const BROWSER_HEADERS: Record<string, string> = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -67,9 +67,13 @@ export type FetchResult = {
 };
 
 export async function fetchLegislationHtml(url: string): Promise<FetchResult> {
+  const headers: Record<string, string> = { ...BROWSER_HEADERS };
+  const apiKey = process.env.NZ_LEGISLATION_API_KEY;
+  if (apiKey) headers["X-Api-Key"] = apiKey;
+
   let resp: Response;
   try {
-    resp = await fetch(url, { headers: BROWSER_HEADERS, redirect: "follow" });
+    resp = await fetch(url, { headers, redirect: "follow" });
   } catch (err) {
     throw new Error(`Network error fetching legislation page: ${(err as Error).message}`);
   }
