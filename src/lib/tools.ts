@@ -165,9 +165,19 @@ export async function getLegislationContent(args: {
 
   const legislationDiv = $("div#legislation").first();
   if (!legislationDiv.length) {
+    // Diagnostics: capture what we actually received so we can compare with
+    // what the local parser sees.
     return textResult(JSON.stringify({
       error: "Could not parse the legislation page. The website structure may have changed.",
       url: finalUrl,
+      debug: {
+        html_bytes: html.length,
+        has_id_legislation_literal: html.includes('id="legislation"'),
+        has_body_class_literal: html.includes('class="body"'),
+        h1_text: $("h1").first().text().slice(0, 120),
+        title_text: $("title").first().text().slice(0, 120),
+        first_400_chars: html.slice(0, 400),
+      },
     }));
   }
   const bodyMaybe = legislationDiv.find("div.body").first();
