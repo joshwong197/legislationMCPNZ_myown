@@ -171,8 +171,20 @@ export function parseToc($: CheerioAPI): TocPart[] {
   if (!tocTable.length) return [];
 
   const parts: TocPart[] = [];
-  let current: TocPart | null = null;
+  let currentPart = "";
+  let currentTitle = "";
+  let inPart = false;
   let secs: string[] = [];
+
+  const flush = (): void => {
+    if (inPart && secs.length > 0) {
+      parts.push({
+        part: currentPart,
+        title: currentTitle,
+        sections: `${secs[0]}-${secs[secs.length - 1]}`,
+      });
+    }
+  };
 
   tocTable.find("tr").each((_, tr) => {
     const $tr = $(tr);
@@ -181,15 +193,12 @@ export function parseToc($: CheerioAPI): TocPart[] {
 
     const partLabel = col2.find("div.tocPartLabel").first();
     if (partLabel.length) {
-      if (current && secs.length) {
-        current.sections = `${secs[0]}-${secs[secs.length - 1]}`;
-        parts.push(current);
-      }
+      flush();
       secs = [];
       const partHeading = col2.find("div.tocPartHeading").first();
-      const partNum = partLabel.text().trim().replace(/^Part\s*/, "");
-      const partTitle = partHeading.length ? partHeading.text().trim() : "";
-      current = { part: partNum, title: partTitle, sections: "" };
+      currentPart = partLabel.text().trim().replace(/^Part\s*/, "");
+      currentTitle = partHeading.length ? partHeading.text().trim() : "";
+      inPart = true;
       return;
     }
 
@@ -203,10 +212,7 @@ export function parseToc($: CheerioAPI): TocPart[] {
     }
   });
 
-  if (current && secs.length) {
-    current.sections = `${secs[0]}-${secs[secs.length - 1]}`;
-    parts.push(current);
-  }
+  flush();
   return parts;
 }
 
