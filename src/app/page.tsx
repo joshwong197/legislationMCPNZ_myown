@@ -16,9 +16,10 @@ export default function Home() {
 
       <h2>Access</h2>
       <p>
-        The MCP endpoint is gated by HTTP Basic Auth. When configuring this server in your MCP
-        client, enter the username and password you were provided. The upstream PCO API key is
-        held server-side and never leaves this server.
+        The MCP endpoint is gated by OAuth 2.1. To connect, paste the endpoint URL into your MCP
+        client&rsquo;s custom-connector setup — your client will redirect you to a login screen
+        hosted here, where you authenticate with a username and password. The upstream PCO API
+        key is held server-side and never leaves this server.
       </p>
 
       <h2>Tools</h2>
@@ -33,8 +34,9 @@ export default function Home() {
       <h2>Privacy</h2>
       <p>
         This server forwards queries to the PCO API and returns the responses. It does not store
-        query content, user identity, or credentials. Basic Auth credentials are compared to
-        environment variables in memory per request; they are never logged or persisted.
+        query content, user identity, or credentials. Login credentials are compared to
+        environment variables in memory per request; they are never logged or persisted. Bearer
+        tokens are stateless signed JWTs &mdash; no database, no token store.
       </p>
     </main>
   );

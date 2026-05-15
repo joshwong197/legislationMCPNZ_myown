@@ -1,5 +1,5 @@
 import { createMcpHandler } from "mcp-handler";
-import { checkBasicAuth, unauthorizedResponse } from "@/lib/auth";
+import { checkBearer, unauthorizedResponse } from "@/lib/auth";
 import { SKILL_INSTRUCTIONS } from "@/lib/skill-instructions";
 import {
   searchLegislation, searchLegislationSchema,
@@ -61,7 +61,7 @@ const handler = createMcpHandler(
 );
 
 async function withAuth(req: Request): Promise<Response> {
-  if (!checkBasicAuth(req)) return unauthorizedResponse();
+  if (!(await checkBearer(req))) return unauthorizedResponse(req);
   return handler(req);
 }
 

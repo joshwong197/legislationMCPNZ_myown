@@ -21,9 +21,18 @@ The NZ-legislation skill (4-part output: Quick Answer / Verbatim Text / Explanat
 ## Architecture
 
 - **Transport:** streamable HTTP at `/api/mcp/mcp`, legacy SSE at `/api/mcp/sse`. The dynamic `[transport]` segment is auto-routed by `mcp-handler`.
-- **Auth:** HTTP Basic Auth wrapper checks `Authorization: Basic …` against `MCP_USER` / `MCP_PASS` env vars (timing-safe compare). Configure these in your hosting provider.
+- **Auth:** OAuth 2.1 with PKCE and RFC 7591 dynamic client registration. Bearer tokens are stateless signed JWTs (`jose`, HS256). The actual login happens on a server-rendered HTML form at `/api/oauth/authorize`; credentials are checked against `MCP_USER` / `MCP_PASS` env vars (timing-safe compare). Tokens, codes, and client IDs are all signed JWTs — no database.
 - **Upstream API key:** the PCO key (`NZ_LEGISLATION_API_KEY`) is held server-side and never returned to the client. Each upstream request adds it as `X-Api-Key`.
 - **Rate limits:** the server tracks PCO's `X-RateLimit-*` response headers and short-circuits when the daily limit is exhausted. PCO's published limit is 10,000 requests/day with a 2,000-per-5-min burst.
+
+## OAuth endpoints
+
+- `GET /.well-known/oauth-protected-resource` — points clients at the auth server.
+- `GET /.well-known/oauth-authorization-server` — advertises the OAuth endpoints.
+- `POST /api/oauth/register` — dynamic client registration.
+- `GET /api/oauth/authorize` — renders the login form; **this is the screen the user sees when they connect**.
+- `POST /api/oauth/authorize` — validates credentials, issues an auth code.
+- `POST /api/oauth/token` — exchanges code for access token.
 
 ## Local development
 
@@ -43,32 +52,28 @@ The server runs at <http://localhost:3000>. The MCP endpoint is at <http://local
 2. Import the repo into Vercel.
 3. Set environment variables in the Vercel project:
    - `NZ_LEGISLATION_API_KEY` — your PCO API key.
-   - `MCP_USER` — Basic Auth username.
-   - `MCP_PASS` — Basic Auth password. Generate with `openssl rand -base64 24`.
+   - `MCP_USER` — username for the login screen.
+   - `MCP_PASS` — password for the login screen. Generate with `openssl rand -base64 24`.
+   - `OAUTH_SECRET` — random string ≥ 32 chars used to sign JWTs. Generate with `openssl rand -base64 48`.
 4. Deploy. Your endpoint is `https://<your-project>.vercel.app/api/mcp/mcp`.
 
 ## Connecting from Claude.ai
 
-In Claude.ai, add a custom connector:
+In Claude.ai, add a custom connector with just the URL — no other fields:
 
 - **URL:** `https://<your-project>.vercel.app/api/mcp/mcp`
-- **Auth:** Basic
-- **Username:** the value of `MCP_USER`
-- **Password:** the value of `MCP_PASS`
 
-Claude stores the credentials in its connector config and sends them as `Authorization: Basic <base64>` on every request. They are not stored by this server.
-
-## Connecting from Claude Desktop
-
-Claude Desktop's custom connector UI similarly supports remote MCP servers with Basic Auth. Add the same URL and credentials.
+Claude.ai will discover the OAuth endpoints via the `.well-known/` documents, register dynamically, and redirect you to the login screen. Enter your `MCP_USER` and `MCP_PASS`. After successful login, Claude stores the issued bearer token and uses it on every MCP request.
 
 ## Security notes
 
-- The MCP endpoint denies all requests unless `MCP_USER` and `MCP_PASS` are set — there is no "no auth" mode.
-- Credentials are compared with `crypto.timingSafeEqual` to avoid timing leaks.
+- The MCP endpoint denies all requests unless a valid bearer JWT is presented. JWTs are signed with `OAUTH_SECRET`; rotating the secret invalidates every issued token.
+- The login form compares credentials with `crypto.timingSafeEqual`.
+- PKCE is required on the authorize endpoint (S256 or plain).
+- Auth codes are valid for 60 seconds; access tokens for 30 days.
 - The PCO API key is never logged or returned in responses.
 - All traffic is HTTPS (Vercel terminates TLS).
-- Source is auditable. The Basic Auth scheme has no scopes or expiry — rotate the password by changing the env var and redeploying.
+- Source is auditable. To revoke all access, rotate `OAUTH_SECRET` and redeploy.
 
 ## Tools in detail
 
