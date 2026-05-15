@@ -58,14 +58,19 @@ const handler = createMcpHandler(
     serverInfo: { name: "nz-legislation", version: "0.1.0" },
     instructions: SKILL_INSTRUCTIONS,
   },
+  {
+    // basePath must match the parent route folder so the [transport] segment
+    // resolves correctly. Without this, mcp-handler can't tell streamable-HTTP
+    // from SSE and returns 404.
+    basePath: "/api/mcp",
+    verboseLogs: true,
+  },
 );
 
 type RouteContext = { params: Promise<{ transport: string }> };
 
 async function withAuth(req: Request, ctx: RouteContext): Promise<Response> {
   if (!(await checkBearer(req))) return unauthorizedResponse(req);
-  // mcp-handler is a Next.js route handler — forward the full (req, ctx)
-  // pair so it can read the [transport] segment and dispatch correctly.
   return (handler as unknown as (r: Request, c: RouteContext) => Promise<Response>)(req, ctx);
 }
 
