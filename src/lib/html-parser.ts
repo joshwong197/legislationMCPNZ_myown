@@ -33,16 +33,30 @@ export function workIdToUrlFlexible(workId: string): string {
   return `${LEGISLATION_WEBSITE}/${legType}/${subtype}/${year}/${number}/en/latest/`;
 }
 
-// legislation.govt.nz sits behind CloudFront + AWS ALB which silently return
-// empty 200 responses to non-browser User-Agents. We send a realistic UA and
-// the usual browser Accept headers so the upstream returns the real HTML.
+// legislation.govt.nz is fronted by CloudFront + AWS WAF, which serves a
+// JS challenge page to requests that don't look like a real browser session.
+// Sending the full set of sec-fetch / sec-ch-ua headers + Accept-Encoding +
+// upgrade-insecure-requests sometimes lets us through; if not, we'll need to
+// proxy the fetch through a non-AWS-edge host.
 const BROWSER_HEADERS: Record<string, string> = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
   Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-  "Accept-Language": "en-NZ,en;q=0.9",
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "Accept-Language": "en-NZ,en-GB;q=0.9,en;q=0.8",
+  "Accept-Encoding": "gzip, deflate, br, zstd",
+  "Cache-Control": "max-age=0",
+  "Upgrade-Insecure-Requests": "1",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-User": "?1",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Ch-Ua":
+    '"Chromium";v="131", "Not_A Brand";v="24", "Google Chrome";v="131"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"Windows"',
+  Referer: "https://www.google.com/",
 };
 
 export type FetchResult = {
