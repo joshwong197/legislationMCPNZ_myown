@@ -83,7 +83,9 @@ function extractLabelPara($: CheerioAPI, lp: El, depth: number): string {
   const para = lp.children("div.para").first();
   if (para.length) {
     const textParts: string[] = [];
-    para.children("p.text").each((_, p) => textParts.push($(p).text().trim()));
+    para.children("p.text").each((_, p) => {
+      textParts.push($(p).text().trim());
+    });
     const mainText = textParts.join(" ");
     if (label) {
       lines.push(`${ind}${label} ${mainText}`.trim());
