@@ -60,9 +60,13 @@ const handler = createMcpHandler(
   },
 );
 
-async function withAuth(req: Request): Promise<Response> {
+type RouteContext = { params: Promise<{ transport: string }> };
+
+async function withAuth(req: Request, ctx: RouteContext): Promise<Response> {
   if (!(await checkBearer(req))) return unauthorizedResponse(req);
-  return handler(req);
+  // mcp-handler is a Next.js route handler — forward the full (req, ctx)
+  // pair so it can read the [transport] segment and dispatch correctly.
+  return (handler as unknown as (r: Request, c: RouteContext) => Promise<Response>)(req, ctx);
 }
 
 export { withAuth as GET, withAuth as POST, withAuth as DELETE };
