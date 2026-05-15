@@ -2,18 +2,22 @@
  * Derive the canonical base URL of this server. Used to populate OAuth
  * metadata documents and redirect URLs.
  *
- * We use the incoming request's host so the issuer always matches whatever
- * hostname the client is actually connecting through (project alias, custom
- * domain, or per-deployment hash URL). Vercel's `VERCEL_URL` env var points
- * at the deployment-hash URL even when the client used the project alias, so
- * we deliberately do not read it.
+ * On Vercel, `new URL(req.url).host` returns the internal deployment-hash
+ * hostname, not the project alias the client actually typed. We read the
+ * forwarded host header instead, which Vercel sets to the original hostname.
  *
- * OAUTH_ISSUER can still be set to pin a canonical hostname when fronted by
- * a CDN that rewrites the Host header.
+ * OAUTH_ISSUER overrides everything for custom-domain setups.
  */
 export function getBaseUrl(req: Request): string {
   const envUrl = process.env.OAUTH_ISSUER;
   if (envUrl) return envUrl.replace(/\/$/, "");
+
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost ?? req.headers.get("host");
+  const forwardedProto = req.headers.get("x-forwarded-proto") ?? "https";
+
+  if (host) return `${forwardedProto}://${host}`;
+
   const url = new URL(req.url);
   return `${url.protocol}//${url.host}`;
 }
