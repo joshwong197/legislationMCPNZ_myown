@@ -27,6 +27,7 @@ export async function POST(req: Request) {
   }
 
   const clientId = await issueClientId(uris);
+  console.log("[oauth/register]", { redirect_uris: uris });
 
   return NextResponse.json({
     client_id: clientId,

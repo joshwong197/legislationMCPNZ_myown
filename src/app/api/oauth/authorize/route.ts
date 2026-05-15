@@ -124,8 +124,16 @@ function renderLogin(params: AuthorizeParams, errorMsg?: string): string {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const validation = await validateParams(readParams(url.searchParams));
+  const params = readParams(url.searchParams);
+  console.log("[oauth/authorize GET]", {
+    client_id_prefix: (params.client_id ?? "").slice(0, 16),
+    redirect_uri: params.redirect_uri,
+    response_type: params.response_type,
+    code_challenge_method: params.code_challenge_method,
+  });
+  const validation = await validateParams(params);
   if (!validation.ok) {
+    console.log("[oauth/authorize GET] validation failed:", validation.reason);
     return new NextResponse(`OAuth error: ${validation.reason}`, { status: 400 });
   }
   return new NextResponse(renderLogin(validation.params), {
