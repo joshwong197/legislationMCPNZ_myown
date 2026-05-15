@@ -33,13 +33,29 @@ export function workIdToUrlFlexible(workId: string): string {
   return `${LEGISLATION_WEBSITE}/${legType}/${subtype}/${year}/${number}/en/latest/`;
 }
 
-export async function fetchLegislationHtml(url: string): Promise<{ html: string; finalUrl: string }> {
+// legislation.govt.nz sits behind CloudFront + AWS ALB which silently return
+// empty 200 responses to non-browser User-Agents. We send a realistic UA and
+// the usual browser Accept headers so the upstream returns the real HTML.
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-NZ,en;q=0.9",
+};
+
+export type FetchResult = {
+  html: string;
+  finalUrl: string;
+  status: number;
+  contentType: string;
+};
+
+export async function fetchLegislationHtml(url: string): Promise<FetchResult> {
   let resp: Response;
   try {
-    resp = await fetch(url, {
-      headers: { "User-Agent": "NZ-Legislation-MCP/1.0" },
-      redirect: "follow",
-    });
+    resp = await fetch(url, { headers: BROWSER_HEADERS, redirect: "follow" });
   } catch (err) {
     throw new Error(`Network error fetching legislation page: ${(err as Error).message}`);
   }
@@ -49,7 +65,12 @@ export async function fetchLegislationHtml(url: string): Promise<{ html: string;
   if (resp.status >= 400) {
     throw new Error(`HTTP ${resp.status} fetching ${url}`);
   }
-  return { html: await resp.text(), finalUrl: resp.url };
+  return {
+    html: await resp.text(),
+    finalUrl: resp.url,
+    status: resp.status,
+    contentType: resp.headers.get("content-type") ?? "",
+  };
 }
 
 function tagName($c: El): string {

@@ -154,8 +154,11 @@ export async function getLegislationContent(args: {
 
   let html: string;
   let finalUrl: string;
+  let upstreamStatus: number;
+  let upstreamContentType: string;
   try {
-    ({ html, finalUrl } = await fetchLegislationHtml(targetUrl));
+    ({ html, finalUrl, status: upstreamStatus, contentType: upstreamContentType } =
+      await fetchLegislationHtml(targetUrl));
   } catch (err) {
     return textResult(JSON.stringify({ error: (err as Error).message }));
   }
@@ -165,12 +168,12 @@ export async function getLegislationContent(args: {
 
   const legislationDiv = $("div#legislation").first();
   if (!legislationDiv.length) {
-    // Diagnostics: capture what we actually received so we can compare with
-    // what the local parser sees.
     return textResult(JSON.stringify({
       error: "Could not parse the legislation page. The website structure may have changed.",
       url: finalUrl,
       debug: {
+        upstream_status: upstreamStatus,
+        upstream_content_type: upstreamContentType,
         html_bytes: html.length,
         has_id_legislation_literal: html.includes('id="legislation"'),
         has_body_class_literal: html.includes('class="body"'),
