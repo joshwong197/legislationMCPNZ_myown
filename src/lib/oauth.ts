@@ -137,11 +137,55 @@ function safeStrEqual(a: string, b: string): boolean {
   return timingSafeEqual(aBuf, bBuf);
 }
 
+/**
+ * Build the effective {username: password} map from both configuration sources:
+ *   - the single MCP_USER / MCP_PASS pair (legacy, single-user), and
+ *   - the MCP_USERS_JSON object (multi-user).
+ * The two are merged; on a username clash the JSON map wins. If neither is
+ * configured the map is empty (and every login is denied — fail closed).
+ * Malformed MCP_USERS_JSON is ignored, falling back to the single pair.
+ */
+function buildUserMap(): Map<string, string> {
+  const map = new Map<string, string>();
+
+  // Single pair first, so the JSON map can override it on a clash.
+  const singleUser = process.env.MCP_USER;
+  const singlePass = process.env.MCP_PASS;
+  if (singleUser && singlePass) {
+    map.set(singleUser, singlePass);
+  }
+
+  // Multi-user JSON map.
+  const raw = process.env.MCP_USERS_JSON;
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const [name, password] of Object.entries(parsed as Record<string, unknown>)) {
+          if (name.length > 0 && typeof password === "string" && password.length > 0) {
+            map.set(name, password); // JSON map wins any clash with the single pair
+          }
+        }
+      }
+    } catch {
+      // Malformed MCP_USERS_JSON — ignore it and fall back to the single pair.
+    }
+  }
+
+  return map;
+}
+
 export function checkCredentials(user: string, pass: string): boolean {
-  const expectedUser = process.env.MCP_USER;
-  const expectedPass = process.env.MCP_PASS;
-  if (!expectedUser || !expectedPass) return false;
-  return safeStrEqual(user, expectedUser) && safeStrEqual(pass, expectedPass);
+  const users = buildUserMap();
+  const expectedPass = users.get(user);
+
+  // Always run the constant-time compare, even for an unknown username
+  // (against an empty dummy value), so a missing username is not
+  // distinguishable from a wrong password by timing.
+  const passMatch = safeStrEqual(pass, expectedPass ?? "");
+
+  // Fail closed: empty/unconfigured map => expectedPass is undefined => denied.
+  return expectedPass !== undefined && passMatch;
 }
 
 // ---------------------------------------------------------------------------
