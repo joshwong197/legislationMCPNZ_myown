@@ -21,7 +21,7 @@ The NZ-legislation skill (4-part output: Quick Answer / Verbatim Text / Explanat
 ## Architecture
 
 - **Transport:** streamable HTTP at `/api/mcp/mcp`, legacy SSE at `/api/mcp/sse`. The dynamic `[transport]` segment is auto-routed by `mcp-handler`.
-- **Auth:** OAuth 2.1 with PKCE and RFC 7591 dynamic client registration. Bearer tokens are stateless signed JWTs (`jose`, HS256). The actual login happens on a server-rendered HTML form at `/api/oauth/authorize`; credentials are checked against `MCP_USER` / `MCP_PASS` env vars (timing-safe compare). Tokens, codes, and client IDs are all signed JWTs — no database.
+- **Auth:** OAuth 2.1 with PKCE and RFC 7591 dynamic client registration. Bearer tokens are stateless signed JWTs (`jose`, HS256). The actual login happens on a server-rendered HTML form at `/api/oauth/authorize`; credentials are checked (timing-safe compare) against an effective user map built from the single `MCP_USER` / `MCP_PASS` pair **and/or** a multi-user `MCP_USERS_JSON` object (`{"alice":"pw1","bob":"pw2"}`). The two sources are merged; on a username clash `MCP_USERS_JSON` wins. The username typed at login becomes the request identity (the `user` claim in the access token). Tokens, codes, and client IDs are all signed JWTs — no database.
 - **Upstream API key:** the PCO key (`NZ_LEGISLATION_API_KEY`) is held server-side and never returned to the client. Each upstream request adds it as `X-Api-Key`.
 - **Rate limits:** the server tracks PCO's `X-RateLimit-*` response headers and short-circuits when the daily limit is exhausted. PCO's published limit is 10,000 requests/day with a 2,000-per-5-min burst.
 
@@ -52,8 +52,9 @@ The server runs at <http://localhost:3000>. The MCP endpoint is at <http://local
 2. Import the repo into Vercel.
 3. Set environment variables in the Vercel project:
    - `NZ_LEGISLATION_API_KEY` — your PCO API key.
-   - `MCP_USER` — username for the login screen.
+   - `MCP_USER` — username for the login screen (single-user mode).
    - `MCP_PASS` — password for the login screen. Generate with `openssl rand -base64 24`.
+   - `MCP_USERS_JSON` *(optional)* — multi-user map, e.g. `{"alice":"pw1","bob":"pw2"}`. Merged with the single pair above; wins on a username clash. Use this instead of (or alongside) `MCP_USER`/`MCP_PASS` to give people their own logins.
    - `OAUTH_SECRET` — random string ≥ 32 chars used to sign JWTs. Generate with `openssl rand -base64 48`.
 4. Deploy. Your endpoint is `https://<your-project>.vercel.app/api/mcp/mcp`.
 
